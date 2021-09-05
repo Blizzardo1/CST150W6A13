@@ -22,6 +22,7 @@ namespace CST150W6A13
 
         public bool GameEnded => _gameEnded;
 
+        private BufferedGraphics bg;
         private Graphics g;
 
         int counter = 0;
@@ -37,7 +38,8 @@ namespace CST150W6A13
 
         public Board(Graphics context)
         {
-            g = context;
+            bg = BufferedGraphicsManager.Current.Allocate(context, new Rectangle(0, 0, Columns * Square.Size, Rows * Square.Size));
+            g = bg.Graphics;
         }
 
         public void Initialize()
@@ -47,9 +49,15 @@ namespace CST150W6A13
             {
                 for (int x = 0; x < Columns; x++)
                 {
+                    slots[x, y] = new(bg.Graphics);
+                    slots[x, y].Initialize();
                     slots[x, y].SetMarker(Marker.N);
                 }
             }
+            player1 = new ("Player 1", Marker.O,1);
+            player2 = new ("Player 2", Marker.X,2);
+            player1.SetActive();
+            CurrentPlayer = player1;
         }
 
         private string sqMsg;
@@ -63,45 +71,52 @@ namespace CST150W6A13
                     // Draw Routine, check for graphics leaks
                     sqMsg = $"{x}, {y}";
                     var sqsz = g.MeasureString(sqMsg, font);
-                    g.FillRectangle(Brushes.Black, new(x, y, Square.Size, Square.Size));
+                    slots[x, y].Draw(deltaTime);
                     g.DrawString(sqMsg, font, Brushes.White, new PointF(((x + Square.Size) / 2) - (sqsz.Width / 2), ((y + Square.Size) / 2) - (sqsz.Height / 2)));
                 }
             }
+            g.DrawString($"{CurrentPlayer.PlayerName}'s turn", font, Brushes.White, new PointF(0, 0));
         }
 
         public void Update(TimeSpan deltaTime)
         {
+            for (int y = 0; y < Rows; y++)
+            {
+                for (int x = 0; x < Columns; x++)
+                {
+                    if (!Cursor.Clip.IntersectsWith(slots[x, y]) && !slots[x,y].Clicked)
+                        continue;
 
+                    if (!UpdateBoard(x, y, CurrentPlayer.PlayerMarker))
+                        continue;
+
+                    if (!CheckGame())
+                    {
+                        counter++;
+                        if (player1.IsActive)
+                        {
+                            player2.SetActive();
+                            player1.SetInactive();
+                            CurrentPlayer = player2;
+                        }
+                        else if (player2.IsActive)
+                        {
+                            player1.SetActive();
+                            player2.SetInactive();
+                            CurrentPlayer = player1;
+                        }
+                    }
+                }
+            }
         }
 
         public bool UpdateBoard(int x, int y, Marker marker)
         {
-            if (slots[x, y].Marker == Marker.N)
-            {
-                slots[x, y].SetMarker(marker);
-            }
-            else
-            {
-                Console.SetCursorPosition(Spacing, 7);
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.Write("That space has already been taken! Press any key to continue...");
-                Console.ReadKey(true);
-                Console.ResetColor();
+            if (slots[x, y].Marker != Marker.N)
                 return false;
-            }
+
+            slots[x, y].SetMarker(marker);
             return true;
-        }
-
-        private void DrawLocation(int x, int y, Marker marker)
-        {
-            Console.SetCursorPosition(Spacing - 6 + y + 2, x + 4);
-            Console.BackgroundColor = ConsoleColor.Green;
-
-            if (y == 0)
-                Console.Write("{0}{0}{0}", (char)((int)marker));
-            else
-                Console.Write((char)((int)marker));
-            Console.ResetColor();
         }
 
         private bool CheckGame()
@@ -142,83 +157,11 @@ namespace CST150W6A13
                     if (counter >= 8)
                     {
                         MessageBox.Show("Stalemate!");
-                        Ask();
+                        return true;
                     }
                 }
             }
             return false;
         }
-
-        public void NewGame()
-        {
-            /// Remove block, Create form to create two players
-            // TODO: Form creation; replace block, eventually clearing this entire method out in favor of new design
-            Console.Clear();
-            Console.SetCursorPosition(Spacing, 8);
-            Console.Write("Player 1: ");
-            Player p1 = new(Console.ReadLine(), Marker.O);
-
-            Console.Clear();
-            Console.SetCursorPosition(Spacing, 8);
-            Console.Write("Player 2: ");
-            Player p2 = new(Console.ReadLine(), Marker.X);
-            ///
-
-            p1.SetActive();
-            CurrentPlayer = p1;
-
-            while (!_gameEnded)
-            {
-                
-                Console.Write("{0} : ", CurrentPlayer.PlayerName);
-
-                string input = Console.ReadLine();
-                try
-                {
-                    int x = int.Parse(input.Split(' ')[0]);
-                    int y = int.Parse(input.Split(' ')[1]);
-                    if (UpdateBoard(x, y, CurrentPlayer.PlayerMarker))
-                        if (!CheckGame())
-                        {
-                            counter++;
-                            if (p1.IsActive)
-                            {
-                                p2.SetActive();
-                                p1.SetInactive();
-                                CurrentPlayer = p2;
-                            }
-                            else if (p2.IsActive)
-                            {
-                                p1.SetActive();
-                                p2.SetInactive();
-                                CurrentPlayer = p1;
-                            }
-                        }
-                        else
-                            break;
-                }
-                catch (Exception)
-                {
-                    Console.WriteLine("Input wasn't recognised! Rows and Columns are either 0, 1, or 2");
-                }
-            }
-
-            Ask();
-        }
-
-        public void Ask()
-        {
-            DialogResult mr = MessageBox.Show("Do you want to start a new Game?", "Start New?", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1);
-            if (mr == DialogResult.Yes)
-            {
-                NewGame();
-            }
-            else if (mr == DialogResult.No)
-            {
-                Environment.Exit(0);
-            }
-        }
-
-
     }
 }

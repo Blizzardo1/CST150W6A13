@@ -31,6 +31,7 @@ namespace CST150W6A13
         private void Loop()
         {
             _lastTime = DateTime.Now;
+            board.Initialize();
             while(_gameStarted)
             {
                 _framesRendered++;
@@ -50,7 +51,7 @@ namespace CST150W6A13
         public void Start()
         {
             _gameStarted = true;
-            Task.Factory.StartNew(() => Loop());
+            Task.Run(() => Loop()).ConfigureAwait(false).GetAwaiter().GetResult();
         }
     }
 }
